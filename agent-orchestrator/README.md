@@ -51,3 +51,20 @@ npm test
 ## DB 경로
 환경변수 `ORCH_DB_PATH` 없으면
 `${HOME}/.openclaw/data/orchestrator.db` 사용
+
+## 커밋/리뷰 책임 추적 규칙
+Phase 1 협업(회사재규/집재규)은 아래 규칙을 반드시 지킵니다.
+
+### 작성/커밋
+- 커밋 메시지에 역할을 포함합니다.
+  - 예: `feat: implement heartbeat lease (company: 회사재규)`
+  - 예: `docs: improve review notes (home: 집재규)`
+
+### 리뷰 코멘트
+- 리뷰 코멘트는 끝에 작성자 태그를 남깁니다.
+  - `Reviewer: 집재규 (home-agent)`
+  - `Reviewer: 회사재규 (company-agent)`
+
+### PR 본문/요약
+- Author / Reviewer / 리뷰 시간은 PR 본문 최상단에 기록합니다.
+- 동일 항목 변경시 누가 했는지 추적 가능한 로그를 남깁니다.
