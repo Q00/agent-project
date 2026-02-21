@@ -61,3 +61,18 @@ npm test
 ## 추적 규칙
 - 커밋/리뷰에는 작성자/리뷰자 정보를 남겨 역할 추적을 유지
 - PR 본문과 코멘트에 `Author`, `Reviewer`, `Source` 메타 항목 반영
+
+## Contributors
+
+### Phase 1 (2026-02-22)
+- **회사재규 (Company Agent)**: Core implementation
+  - SQLite schema design
+  - `claimTask` / `heartbeat` / `releaseTask` / `staleRecovery`
+  - Test scenarios
+  - Merge to main
+
+- **집재규 (Home Agent)**: Design guard & review
+  - Architecture review
+  - Documentation
+  - Code review & approval
+  - README (KO/EN)
