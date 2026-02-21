@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS task_queue (
   started_at TEXT,
   finished_at TEXT,
   retry_count INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  next_retry_at TEXT,
   error_code TEXT,
   error_msg TEXT
 );
@@ -64,6 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_session_state_status_updated ON session_state(sta
 CREATE INDEX IF NOT EXISTS idx_session_state_heartbeat ON session_state(heartbeat_at);
 CREATE INDEX IF NOT EXISTS idx_task_status ON task_queue(status, priority, created_at);
 CREATE INDEX IF NOT EXISTS idx_task_session ON task_queue(session_id);
+CREATE INDEX IF NOT EXISTS idx_task_retry ON task_queue(next_retry_at, status, retry_count);
 CREATE INDEX IF NOT EXISTS idx_event_log_session_seq ON event_log(session_id, event_seq ASC);
 CREATE INDEX IF NOT EXISTS idx_event_log_created ON event_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lock_expiry ON distributed_lock(expires_at);
