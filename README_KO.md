@@ -76,3 +76,17 @@ npm test
   - Documentation
   - Code review & approval
   - README (KO/EN)
+
+### 커밋 소유권 정리 (히스토리 추적용)
+강제 푸시 이력 교체 없이 누가 어떤 히스토리 커밋인지 명시합니다.
+
+- `b5ebb91` → `feat: implement sqlite phase1 orchestrator core (company-agent)`
+- `96c4fe2` → `docs: add project origin and phase-1 intent (company-agent)`
+- `9d26619` → `chore: add node_modules to .gitignore (company-agent)`
+- `bf0b099` → `docs: add phase1 project history, roles, and execution summary (home-agent)`
+- `07c42a6` → `docs: clarify phase1 origin from session memory-loss pain point (home-agent)`
+- `4a2f9d5` → `docs: normalize Phase 1 commit ownership mapping (home-agent)`
+- `2c079e1` → `docs: add contributors section for phase 1 (home-agent)`
+- `47f08a8` → `docs: add contributors mapping in Korean README (home-agent)`
+
+향후 커밋은 `(company-agent)`/`(home-agent)` 태그를 계속 사용해 추적성을 유지합니다.

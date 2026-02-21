@@ -78,3 +78,17 @@ Expected output includes `ALL TESTS PASSED`.
   - Project history and decision documentation
   - Bilingual README and project onboarding docs
   - Commit/review traceability rules
+
+### Commit ownership ledger (historical)
+To avoid force-push churn, ownership records are now tracked here for the current rewritten history.
+
+- `b5ebb91` -> `feat: implement sqlite phase1 orchestrator core (company-agent)`
+- `96c4fe2` -> `docs: add project origin and phase-1 intent (company-agent)`
+- `9d26619` -> `chore: add node_modules to .gitignore (company-agent)`
+- `bf0b099` -> `docs: add phase1 project history, roles, and execution summary (home-agent)`
+- `07c42a6` -> `docs: clarify phase1 origin from session memory-loss pain point (home-agent)`
+- `4a2f9d5` -> `docs: normalize Phase 1 commit ownership mapping (home-agent)`
+- `2c079e1` -> `docs: add contributors section for phase 1 (home-agent)`
+- `47f08a8` -> `docs: add contributors mapping in Korean README (home-agent)`
+
+This list is an explicit handoff note; future commits should continue using `(company-agent)` / `(home-agent)` tags in commit subjects.
