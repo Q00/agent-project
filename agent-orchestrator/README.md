@@ -1,32 +1,41 @@
 # Agent Orchestrator Phase 1 (SQLite)
 
-이 저장소는 **에이전트가 세션 리셋/동시성 충돌/중단 상황에서도 계속 이어질 수 있게** 만드는 신뢰성 오케스트레이션 PoC입니다.
+This repository is a reliability-first Phase 1 PoC for an agent orchestrator that can continue working across session resets, concurrent execution, and process restarts.
 
-## 왜 시작했나 (기원)
-회사재규(실행)와 집재규(설계/가드)가 서로 다른 맥북에서 작업하면서,
-"세션/작업 상태가 에이전트마다 사라지거나 꼬이는" 문제가 자주 생겼습니다.
+## Why this project started
+House-agent (implementation) and Company-agent (execution) often run on different machines.
+In practice, state kept only in memory/files caused:
+- lost context after reset
+- duplicated work under concurrency
+- hard-to-debug crashes with no reliable recovery trail
 
-그래서
-- **메모리/파일 기반 상태의 휘발성**을 벗어나고,
-- **작업 인계가 끊기지 않는 구조**를 만들고,
-- **실험이 실패해도 복구 가능한 시스템**으로 바꾸자는 목적에서 시작했습니다.
+So we built this as the foundation for a recoverable execution loop:
+- single source of truth for session state
+- safe lock/lease flow
+- idempotent task handling
+- event-sourced logs for replay and debugging
 
-최종 목표는 단순 기능 구현이 아니라,
+## What we are building
+### Core goals
+- Preserve session continuity
+- Prevent duplicate/colliding execution
+- Auto-recover stale/inactive sessions
 
-- `세션 지속성`
-- `동시성 충돌 방지`
-- `자동 복구`
+### Core APIs
+- `claimTask()` — start a unit of work + acquire lock
+- `heartbeat()` — emit alive signals and extend lease
+- `releaseTask()` — finalize task result and release lock
+- `staleRecovery()` — recover stale sessions and requeue unfinished work
+- `event_log` — append-only audit trail for consistency checks
 
-를 한 번에 확보해, `재시작해도 같은 의도로 돌아오는` 오케스트레이션 루프를 갖추는 것입니다.
+## Repository structure
+- `src/db.js` : DB connection/config
+- `src/schema.sql` : schema definitions
+- `src/orchestrator.js` : core orchestration logic (`claim/heartbeat/release`)
+- `src/staleRecovery.js` : stale session recovery logic
+- `src/test.js` : test scenarios
 
-## 구성
-- `src/db.js` : DB 연결/초기 설정
-- `src/schema.sql` : 스키마
-- `src/orchestrator.js` : 핵심 3개 함수 + 상태 전이
-- `src/staleRecovery.js` : stale 세션 감지 및 복구
-- `src/test.js` : 테스트 시나리오
-
-## 실행
+## How to run
 ```bash
 cd agent-orchestrator
 npm install
@@ -34,20 +43,39 @@ npm run init-db
 npm test
 ```
 
-## 테스트 시나리오
-1. claim + release 성공
-2. 동시 claim 중 한 개만 성공
-3. lock 만료 후 takeover
-4. 중복 claim skip
-5. stale 복구
+## Test scenarios
+1. claim + release success
+2. concurrent claim (only one succeeds)
+3. lock expiry take-over
+4. duplicate claim is skipped (idempotent behavior)
+5. stale recovery
 
-## 우리가 만들고자 한 것 (요약)
-- `claimTask()` : 작업 시작 + 락 확보
-- `heartbeat()` : 살아있음 신고 + TTL 연장
-- `releaseTask()` : 작업 완료/실패 반영 + 락 해제
-- `staleRecovery()` : heartbeat/락 만료로 죽은 세션 복구
-- `event_log`를 통한 **append-only 감사 로그**로 추적 가능성 확보
+## DB path
+If `ORCH_DB_PATH` is not set, defaults to:
+`${HOME}/.openclaw/data/orchestrator.db`
 
-## DB 경로
-환경변수 `ORCH_DB_PATH` 없으면
-`${HOME}/.openclaw/data/orchestrator.db` 사용
+## Roles (current mode)
+- **JQ (origin)**: product direction and decisions
+- **Home-agent / 집재규**: design guard, review, and verification
+- **Company-agent / 회사재규**: implementation and execution
+- Current Phase 1 execution mode: local SQLite per machine + GitHub for code collaboration
+- Future mode: shared backend (e.g., PostgreSQL) for true live shared state
+
+---
+
+## 한국어 보조 요약 (Secondary)
+### 왜 만들었는가
+회사재규(회사 맥북)와 집재규(집 맥북)에서 작업하다 보니,
+메모/파일 기반 상태는 세션 리셋이나 동시 작업에서 쉽게 끊기고 충돌이 생김.
+
+### 만들고자 한 것
+- 상태의 단일 진실소스(session_state/event_log)
+- 락 기반 동시성 제어
+- 하트비트 + stale 감지 복구
+- 중복 실행 방지
+
+### 실행
+`npm install` → `npm run init-db` → `npm test`
+
+### 테스트
+claim/release, 동시 claim, lock takeover, duplicate skip, stale 복구가 핵심입니다.
