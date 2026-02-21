@@ -6,7 +6,8 @@
   "scripts": {
     "init-db": "node src/init-db.js",
     "start": "node src/test.js",
-    "test": "node src/test.js"
+    "test": "node src/test.js",
+    "metrics": "node src/report_metrics.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0"
