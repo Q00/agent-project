@@ -1,0 +1,14 @@
+{
+  "name": "agent-orchestrator-phase1",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "init-db": "node src/init-db.js",
+    "start": "node src/test.js",
+    "test": "node src/test.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0"
+  }
+}
