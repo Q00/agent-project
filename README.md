@@ -92,3 +92,7 @@ To avoid force-push churn, ownership records are now tracked here for the curren
 - `47f08a8` -> `docs: add contributors mapping in Korean README (home-agent)`
 
 This list is an explicit handoff note; future commits should continue using `(company-agent)` / `(home-agent)` tags in commit subjects.
+
+## Phase 2 preparation
+- [Phase 2 Design (SQLite -> PostgreSQL)](agent-orchestrator/docs/phase2-design.md)
+- [Phase 2 Test Plan](agent-orchestrator/docs/phase2-test-plan.md)
