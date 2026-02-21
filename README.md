@@ -64,3 +64,17 @@ Expected output includes `ALL TESTS PASSED`.
 ## Governance notes
 - Commits and reviews include explicit role metadata for traceability (`Author`, `Reviewer`, `Source`).
 - PRs should reflect who wrote and who reviewed each change.
+
+## Contributors
+
+### Phase 1 (2026-02-22)
+- **회사재규 (Company Agent)**: Core implementation
+  - SQLite schema design
+  - `claimTask` / `heartbeat` / `releaseTask` / `staleRecovery`
+  - Test scenarios
+  - Merge to main
+
+- **집재규 (Home Agent)**: Design guard & review
+  - Project history and decision documentation
+  - Bilingual README and project onboarding docs
+  - Commit/review traceability rules
