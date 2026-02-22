@@ -61,6 +61,18 @@ npm test
 - `lock_events`: claim/heartbeat/release/stale recovery 충돌 이력 로그
 - `alerts`: 운영 임계치 초과 알림 집계
 
+
+### Phase 3 임계치 권고값 (수락안)
+```bash
+export METRICS_THRESHOLD_STALE_RECOVERY_FAILURE_RATE=0.15
+export METRICS_THRESHOLD_ORPHANED_LOCKS=5
+export METRICS_THRESHOLD_DEAD_LETTERS_OPEN=5
+export METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS=150
+export METRICS_THRESHOLD_RETRY_LIMIT_REACHED=1
+export METRICS_THRESHOLD_DUPLICATE_SUPPRESSED=20
+```
+`METRICS_THRESHOLD_STALE_FAILURE_RATE` 이전 이름도 하위 호환되어 동작.
+
 ## 테스트 시나리오
 1. claim + release 성공
 2. 동시 claim 중 한 개만 성공
@@ -78,3 +90,19 @@ npm test
 ## DB 경로
 환경변수 `ORCH_DB_PATH` 없으면
 `${HOME}/.openclaw/data/orchestrator.db` 사용
+
+### Phase 3 (강건성)
+
+Phase 3 starts with load/회귀용 스모크:
+- `npm run phase3:concurrency -- --workers=4 --tasks=200 --iterations=25 --failRate=0.1`
+- `npm run phase3:regression -- --rounds=3 --workers=3 --tasks=120 --iterations=60 --failRate=0.08`
+
+수집 지표:
+- lock contention (`busy`/`noTask` 비율)
+- `lockConflictEvents`
+- `staleRecoveryFailureRate`
+- `deadLettersOpen`
+- `retryLimitReached`
+
+`metrics` 임계치가 자주 경고를 내면 테스트 파라미터(동시성/재시도/TTL)를 조정해 튜닝한다.
+

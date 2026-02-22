@@ -51,4 +51,10 @@ assert(parsed.retryAttempts === 7, 'parseEnvRetries');
 assert(parsed.retryLimitReached === 99, 'parseEnvRetryLimit');
 assert(parsed.staleRecoveryFailureRate === 0.5, 'parseEnvFailureRate');
 
+const envAlias = {
+  METRICS_THRESHOLD_STALE_RECOVERY_FAILURE_RATE: '0.25',
+};
+const parsedAlias = parseEnvThresholds(envAlias);
+assert(parsedAlias.staleRecoveryFailureRate === 0.25, 'parseEnvFailureRateAlias');
+
 console.log('All Phase 2-4 alert rule tests passed ✅');
