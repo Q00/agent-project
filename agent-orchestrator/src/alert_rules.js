@@ -8,7 +8,7 @@ export const DEFAULT_ALERT_THRESHOLDS = {
   staleRecoveryFailureRate: 0.15,
   deadLettersOpen: 2,
   lockConflictEvents: 220,
-  orphanedLocks: 5,
+  orphanedLocks: 0,
 };
 
 function toNumber(v, fallback = 0) {
