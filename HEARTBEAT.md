@@ -38,12 +38,16 @@ _(rotate through these, 2-4x/day)_
 _Edit this freely. Delete completed items._
 
 - [ ] Phase 3 임계치(수락안) 문서/적용 점검
+  - `METRICS_THRESHOLD_RETRY_ATTEMPTS=20`
   - `METRICS_THRESHOLD_RETRY_LIMIT_REACHED=1`
+  - `METRICS_THRESHOLD_LOCK_EXPIRED=3`
+  - `METRICS_THRESHOLD_DUPLICATE_SUPPRESSED=5`
   - `METRICS_THRESHOLD_STALE_FAILURE_RATE=0.15`
-  - `METRICS_THRESHOLD_DEAD_LETTERS_OPEN=1`
-  - `METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS=150`
-  - `METRICS_THRESHOLD_ORPHANED_LOCKS=0`
+  - `METRICS_THRESHOLD_DEAD_LETTERS_OPEN=2`
+  - `METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS=220`
+  - `METRICS_THRESHOLD_ORPHANED_LOCKS=5`
 - [ ] Phase 3 PR 브랜치/PR 생성 (`feat/phase3-stress`)
+
 
 ## 2026-02-22 10:41KST - PR 생성 확인 요청
 - PR #2(8b485d9) 생성 필요: `gh pr create` 미실행 상태 확인
@@ -64,3 +68,41 @@ _Edit this freely. Delete completed items._
 - HEARTBEAT에 Phase 3 임계치 점검/PR 체크리스트 반영
 - `METRICS_THRESHOLD_STALE_RECOVERY_FAILURE_RATE` 환경변수 alias 파싱 테스트 추가
 - `npm test` + `node src/test_alerts.js` 통과
+
+## 2026-02-22 11:50KST - Phase 3 임계치 확정안 업데이트(보완)
+- 최신 수락안(60m 기준)으로 `alert_rules.js` 기본 임계치 갱신:
+  - `METRICS_THRESHOLD_RETRY_ATTEMPTS=20`
+  - `METRICS_THRESHOLD_RETRY_LIMIT_REACHED=1`
+  - `METRICS_THRESHOLD_LOCK_EXPIRED=3`
+  - `METRICS_THRESHOLD_DUPLICATE_SUPPRESSED=5`
+  - `METRICS_THRESHOLD_STALE_FAILURE_RATE=0.15`
+  - `METRICS_THRESHOLD_DEAD_LETTERS_OPEN=2`
+  - `METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS=220`
+- README/HEARTBEAT의 Phase 3 권고 임계치도 동일 기준으로 정렬
+
+## 2026-02-22 11:58KST - orphanedLocks 임계치 최종 확정
+- `METRICS_THRESHOLD_ORPHANED_LOCKS` 수락안 최종값을 `0`으로 확정.
+- `alert_rules.js` 기본값을 `0`으로 수정 반영.
+- README/HEARTBEAT 임계치 문구를 동기화.
+
+## 2026-02-22 12:10KST - Phase 3 임계치 1차안 반영
+- 수락안 1차 기준으로 임계치 블록 정렬:
+  - `METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS=150`
+  - `METRICS_THRESHOLD_STALE_RECOVERY_FAILURE_RATE=0.15`
+  - `METRICS_THRESHOLD_DEAD_LETTERS_OPEN=1`
+  - `METRICS_THRESHOLD_RETRY_LIMIT_REACHED=1`
+  - `METRICS_THRESHOLD_ORPHANED_LOCKS=0`
+- `alert_rules.js` 기본값 업데이트(`deadLettersOpen`, `lockConflictEvents`).
+- README/HEARTBEAT 임계치 섹션 동기화.
+
+## 2026-02-22 12:26KST - Phase 3 실험 케이스 결과 기록 (고정값)
+- Case A: `npm run phase3:concurrency -- --workers=2 --tasks=20 --iterations=15 --failRate=0.08`
+  - 결과: `claims=20, successRate=1, conflictRatio=0.111..., staleInjected=1, lock conflict summary not raised`
+- Case B: `npm run phase3:concurrency -- --workers=4 --tasks=30 --iterations=12 --failRate=0.05`
+  - 결과: `claims=30, successRate=1, conflictRatio=0.277..., staleInjected=1`
+- Case C: `npm run phase3:regression -- --rounds=2 --workers=3 --tasks=12 --iterations=6 --failRate=0.1`
+  - 라운드별 `lockConflictEvents=138`, `deadLettersOpen=0`, `staleRecovered=0`, `staleRecoveryFailed=0`, `orphanedLocks=0`, `retryLimitReached=0`
+- 사용자 전달 실험 요약:
+  - `lockConflictEvents` 기본권고 대비 150 임계치 미만
+  - `deadLettersOpen` / `staleRecoveryFailureRate` / `retryLimitReached` 모두 경보 없음
+- 임계치 문서/알림 규칙은 현재 1차안 기준으로 정렬됨(`lockConflict=150`, `deadLetters=1`, `stale=0.15`, `retryLimit=1`, `orphanedLocks=0`).
