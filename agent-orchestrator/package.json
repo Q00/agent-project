@@ -7,7 +7,9 @@
     "init-db": "node src/init-db.js",
     "start": "node src/test.js",
     "test": "node src/test.js",
-    "metrics": "node src/report_metrics.js"
+    "metrics": "node src/report_metrics.js",
+    "phase3:concurrency": "node src/phase3/bench_concurrency.js",
+    "phase3:regression": "node src/phase3/regression_loop.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0"

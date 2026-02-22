@@ -4,11 +4,11 @@ export const DEFAULT_ALERT_THRESHOLDS = {
   retryAttempts: 10,
   retryLimitReached: 1,
   lockExpired: 3,
-  duplicateSuppressed: 3,
-  staleRecoveryFailureRate: 0.2,
-  deadLettersOpen: 1,
-  lockConflictEvents: 3,
-  orphanedLocks: 1,
+  duplicateSuppressed: 20,
+  staleRecoveryFailureRate: 0.15,
+  deadLettersOpen: 5,
+  lockConflictEvents: 150,
+  orphanedLocks: 5,
 };
 
 function toNumber(v, fallback = 0) {
@@ -29,7 +29,10 @@ export function parseEnvThresholds(env = process.env) {
     retryLimitReached: toNumber(env.METRICS_THRESHOLD_RETRY_LIMIT_REACHED, DEFAULT_ALERT_THRESHOLDS.retryLimitReached),
     lockExpired: toNumber(env.METRICS_THRESHOLD_LOCK_EXPIRED, DEFAULT_ALERT_THRESHOLDS.lockExpired),
     duplicateSuppressed: toNumber(env.METRICS_THRESHOLD_DUPLICATE_SUPPRESSED, DEFAULT_ALERT_THRESHOLDS.duplicateSuppressed),
-    staleRecoveryFailureRate: toNumber(env.METRICS_THRESHOLD_STALE_FAILURE_RATE, DEFAULT_ALERT_THRESHOLDS.staleRecoveryFailureRate),
+    staleRecoveryFailureRate: toNumber(
+      env.METRICS_THRESHOLD_STALE_RECOVERY_FAILURE_RATE ?? env.METRICS_THRESHOLD_STALE_FAILURE_RATE,
+      DEFAULT_ALERT_THRESHOLDS.staleRecoveryFailureRate,
+    ),
     deadLettersOpen: toNumber(env.METRICS_THRESHOLD_DEAD_LETTERS_OPEN, DEFAULT_ALERT_THRESHOLDS.deadLettersOpen),
     lockConflictEvents: toNumber(env.METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS, DEFAULT_ALERT_THRESHOLDS.lockConflictEvents),
     orphanedLocks: toNumber(env.METRICS_THRESHOLD_ORPHANED_LOCKS, DEFAULT_ALERT_THRESHOLDS.orphanedLocks),
