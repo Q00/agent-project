@@ -6,9 +6,9 @@ export const DEFAULT_ALERT_THRESHOLDS = {
   lockExpired: 3,
   duplicateSuppressed: 5,
   staleRecoveryFailureRate: 0.15,
-  deadLettersOpen: 1,
-  lockConflictEvents: 150,
-  orphanedLocks: 0,
+  deadLettersOpen: 2,
+  lockConflictEvents: 220,
+  orphanedLocks: 5,
 };
 
 function toNumber(v, fallback = 0) {
