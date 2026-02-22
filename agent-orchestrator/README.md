@@ -53,6 +53,7 @@ npm test
 - `staleRecoveryFailureRate`
 - `deadLettersOpen`
 - `lockConflictEvents`
+- `orphanedLocks`
 
 `METRICS_ALERT=1`이 출력되면 운영 알림 후보로 처리해 `HEARTBEAT` 또는 runbook에 반영한다.
 
@@ -71,6 +72,7 @@ export METRICS_THRESHOLD_DUPLICATE_SUPPRESSED=5
 export METRICS_THRESHOLD_STALE_FAILURE_RATE=0.15
 export METRICS_THRESHOLD_DEAD_LETTERS_OPEN=2
 export METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS=220
+export METRICS_THRESHOLD_ORPHANED_LOCKS=0
 export METRICS_THRESHOLD_STALE_RECOVERY_FAILURE_RATE=0.15  # 이전 호환 alias
 ```
 
@@ -102,6 +104,7 @@ Phase 3 starts with load/회귀용 스모크:
 수집 지표:
 - lock contention (`busy`/`noTask` 비율)
 - `lockConflictEvents`
+- `orphanedLocks`
 - `staleRecoveryFailureRate`
 - `deadLettersOpen`
 - `retryLimitReached`
