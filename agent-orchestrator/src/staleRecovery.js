@@ -1,4 +1,5 @@
 import { nowIso } from './db.js';
+import { logLockEvent } from './ops.js';
 import { executeWithRetrySync, getNextRetryAt, isRetryable } from './retryPolicy.js';
 import { HEARTBEAT_MS } from './orchestrator.js';
 
@@ -64,6 +65,14 @@ export function staleRecovery({ db, agent = 'watchdog' }) {
       });
     } catch (err) {
       // Log but continue with other sessions
+      logLockEvent({
+        db,
+        lockKey: `session:${row.session_id}:lock`,
+        sessionId: row.session_id,
+        eventType: 'stale_recovery_failed',
+        actor: 'watchdog',
+        payload: { error: err.message }
+      });
       console.error(`staleRecovery failed for session ${row.session_id}:`, err.message);
     }
   }

@@ -70,3 +70,45 @@ CREATE INDEX IF NOT EXISTS idx_task_retry ON task_queue(next_retry_at, status, r
 CREATE INDEX IF NOT EXISTS idx_event_log_session_seq ON event_log(session_id, event_seq ASC);
 CREATE INDEX IF NOT EXISTS idx_event_log_created ON event_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lock_expiry ON distributed_lock(expires_at);
+
+-- Phase 2-4: Operational stability helpers
+CREATE TABLE IF NOT EXISTS alerts (
+  alert_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_key TEXT NOT NULL,
+  level TEXT NOT NULL CHECK(level IN ('info', 'warn', 'error', 'critical')),
+  value REAL NOT NULL,
+  threshold REAL NOT NULL,
+  source TEXT,
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  resolved_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dead_letters (
+  dead_letter_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  payload TEXT NOT NULL DEFAULT '{}',
+  error_code TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  status TEXT NOT NULL DEFAULT 'open',
+  resolved_at TEXT,
+  FOREIGN KEY(session_id) REFERENCES session_state(session_id) ON DELETE CASCADE,
+  UNIQUE(task_id)
+);
+
+CREATE TABLE IF NOT EXISTS lock_events (
+  lock_event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lock_key TEXT NOT NULL,
+  session_id TEXT,
+  event_type TEXT NOT NULL,
+  actor_agent TEXT NOT NULL,
+  payload TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  FOREIGN KEY(session_id) REFERENCES session_state(session_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dead_letters_status ON dead_letters(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lock_events_created ON lock_events(created_at DESC, session_id);

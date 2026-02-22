@@ -34,6 +34,33 @@ npm run init-db
 npm test
 ```
 
+
+## 운영 안정성 (Phase 2-4)
+
+### 실행/검증 체크리스트
+- `git pull --ff-only`
+- `npm run init-db`
+- `npm test`
+- `node src/test_retry.js`
+- `node src/test_metrics.js`
+- `npm run metrics 60`
+
+### 운영 메트릭 포인트
+- `retryAttempts`
+- `retryLimitReached`
+- `lockExpired`
+- `duplicateSuppressed`
+- `staleRecoveryFailureRate`
+- `deadLettersOpen`
+- `lockConflictEvents`
+
+`METRICS_ALERT=1`이 출력되면 운영 알림 후보로 처리해 `HEARTBEAT` 또는 runbook에 반영한다.
+
+### Dead-letter/lock 이벤트
+- `dead_letters`: retry 상한 초과 및 복구 대상 이력 추적 테이블
+- `lock_events`: claim/heartbeat/release/stale recovery 충돌 이력 로그
+- `alerts`: 운영 임계치 초과 알림 집계
+
 ## 테스트 시나리오
 1. claim + release 성공
 2. 동시 claim 중 한 개만 성공

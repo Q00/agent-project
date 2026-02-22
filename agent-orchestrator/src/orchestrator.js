@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { openDatabase, nowIso, withTransaction } from './db.js';
 import { executeWithRetrySync, getNextRetryAt, isRetryable } from './retryPolicy.js';
+import { logLockEvent } from './ops.js';
+import { addDeadLetter } from './dead_letter_handler.js';
 
 const LOCK_TTL_MS = 120000;
 const HEARTBEAT_MS = 30000;
@@ -60,13 +62,37 @@ export function claimTask({ db, sessionId, namespace = 'default', taskTypeFilter
         if (lock) {
           const expired = new Date(lock.expires_at).getTime() <= Date.now();
           if (!expired) {
+            logLockEvent({
+              db,
+              lockKey,
+              sessionId,
+              eventType: 'lock_miss_or_conflict',
+              actor: agent,
+              payload: { reason: 'claim_blocked', lock_owner_token: lock.owner_token }
+            });
             return { ok: false, reason: 'busy' };
           }
           const takeover = db.prepare(`UPDATE distributed_lock SET owner_token=?, owner_agent=?, acquired_at=?, expires_at=?, version=version+1
                                        WHERE lock_key=? AND owner_token=?`).run(lockToken, agent, now, expiresAt, lockKey, lock.owner_token);
           if (takeover.changes === 0) {
+            logLockEvent({
+              db,
+              lockKey,
+              sessionId,
+              eventType: 'lock_takeover_failed',
+              actor: agent,
+              payload: { reason: 'compare_and_swap_failed', lock_owner_token: lock.owner_token }
+            });
             return { ok: false, reason: 'busy' };
           }
+          logLockEvent({
+            db,
+            lockKey,
+            sessionId,
+            eventType: 'lock_takeover',
+            actor: agent,
+            payload: { prev_owner_token: lock.owner_token }
+          });
         } else {
           db.prepare(`INSERT INTO distributed_lock(lock_key, owner_token, owner_agent, acquired_at, expires_at, version)
                       VALUES(?, ?, ?, ?, ?, 1)`).run(lockKey, lockToken, agent, now, expiresAt);
@@ -139,7 +165,17 @@ export function heartbeat({ db, sessionId, lockToken, agent = 'agent' }) {
   const expiresAt = addMs(now, LOCK_TTL_MS);
 
   const lock = db.prepare('SELECT owner_token FROM distributed_lock WHERE lock_key=?').get(lockKey);
-  if (!lock || lock.owner_token !== lockToken) return false; // non-retry
+  if (!lock || lock.owner_token !== lockToken) {
+    logLockEvent({
+      db,
+      lockKey,
+      sessionId,
+      eventType: 'heartbeat_lock_mismatch',
+      actor: agent,
+      payload: { expectedToken: lockToken, actualToken: lock?.owner_token || null }
+    });
+    return false; // non-retry
+  }
 
   const doUpdate = () => {
     const updated = db.prepare(`
@@ -168,7 +204,17 @@ export function releaseTask({ db, sessionId, taskId, lockToken, result, agent = 
   const lockKey = `session:${sessionId}:lock`;
   const now = nowIso();
   const lock = db.prepare('SELECT owner_token FROM distributed_lock WHERE lock_key=?').get(lockKey);
-  if (!lock || lock.owner_token !== lockToken) return { ok: false, reason: 'lock_mismatch' };
+  if (!lock || lock.owner_token !== lockToken) {
+    logLockEvent({
+      db,
+      lockKey,
+      sessionId,
+      eventType: 'release_lock_mismatch',
+      actor: agent,
+      payload: { expectedToken: lockToken, actualToken: lock?.owner_token || null, taskId }
+    });
+    return { ok: false, reason: 'lock_mismatch' };
+  }
 
   const status = result.ok ? 'done' : 'failed';
   const eventType = result.ok ? 'task_finished' : 'task_failed';
@@ -188,6 +234,21 @@ export function releaseTask({ db, sessionId, taskId, lockToken, result, agent = 
 
       db.prepare(`UPDATE task_queue SET status=?, finished_at=?, error_code=?, error_msg=? WHERE task_id=?`)
         .run(status, now, result.errorCode || null, result.errorMsg || null, taskId);
+
+      if (!result.ok) {
+        const taskRow = db.prepare(`SELECT retry_count, session_id FROM task_queue WHERE task_id=?`).get(taskId);
+        if (taskRow && Number(taskRow.retry_count || 0) >= 3) {
+          addDeadLetter({
+            db,
+            taskId,
+            sessionId: taskRow.session_id,
+            reason: 'retry_limit_reached',
+            payload: { taskId, sessionId: taskRow.session_id, retry_count: taskRow.retry_count, last_error: result.errorMsg || result.errorCode },
+            errorCode: result.errorCode || null,
+          });
+        }
+      }
+
       const chkSeq = seq;
       db.prepare(`UPDATE session_state SET status='waiting', phase='idle', inflight_task_id=NULL, checkpoint_seq=?, heartbeat_at=?, updated_at=?, lock_token=NULL, lock_expires_at=NULL
                   WHERE session_id=?`).run(chkSeq, now, now, sessionId);
