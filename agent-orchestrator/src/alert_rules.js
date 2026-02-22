@@ -1,13 +1,13 @@
 // Phase 2-4: centralized operational alert rules
 
 export const DEFAULT_ALERT_THRESHOLDS = {
-  retryAttempts: 10,
+  retryAttempts: 20,
   retryLimitReached: 1,
   lockExpired: 3,
-  duplicateSuppressed: 20,
+  duplicateSuppressed: 5,
   staleRecoveryFailureRate: 0.15,
-  deadLettersOpen: 5,
-  lockConflictEvents: 150,
+  deadLettersOpen: 2,
+  lockConflictEvents: 220,
   orphanedLocks: 5,
 };
 
