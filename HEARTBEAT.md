@@ -45,6 +45,7 @@ _Edit this freely. Delete completed items._
   - `METRICS_THRESHOLD_STALE_FAILURE_RATE=0.15`
   - `METRICS_THRESHOLD_DEAD_LETTERS_OPEN=2`
   - `METRICS_THRESHOLD_LOCK_CONFLICT_EVENTS=220`
+  - `METRICS_THRESHOLD_ORPHANED_LOCKS=0`
 - [ ] Phase 3 PR 브랜치/PR 생성 (`feat/phase3-stress`)
 
 ## 2026-02-22 10:41KST - PR 생성 확인 요청
