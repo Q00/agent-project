@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { openDatabase, nowIso, withTransaction } from './db.js';
-import { executeWithRetrySync, getNextRetryAt, isRetryable } from './retryPolicy.js';
+import { executeWithRetrySync, getNextRetryAt, isRetryable, shouldRetry, DEFAULT_MAX_RETRIES } from './retryPolicy.js';
 import { logLockEvent } from './ops.js';
 import { addDeadLetter } from './dead_letter_handler.js';
 
@@ -9,6 +9,7 @@ export * from './taskQueue.js';
 
 const LOCK_TTL_MS = 120000;
 const HEARTBEAT_MS = 30000;
+const RETRY_STATUS_QUEUED = 'queued';
 
 function parseOrNow(v, fallback = null) {
   return v ? new Date(v).getTime() : fallback;
@@ -102,9 +103,9 @@ export function claimTask({ db, sessionId, namespace = 'default', taskTypeFilter
         }
 
         const pendingRow = db.prepare(`SELECT task_id, task_type, payload, status FROM task_queue
-                                       WHERE session_id=? AND status='pending' ${taskTypeFilter ? 'AND task_type=?' : ''}
-                                       ORDER BY priority ASC, created_at ASC LIMIT 1`)
-                              .get(sessionId, ...(taskTypeFilter ? [taskTypeFilter] : []));
+                                       WHERE session_id=? AND status IN ('pending','queued') AND (next_retry_at IS NULL OR next_retry_at <= ?)  ${taskTypeFilter ? 'AND task_type=?' : ''}
+                                         ORDER BY priority ASC, COALESCE(next_retry_at, created_at) ASC, created_at ASC LIMIT 1`)
+                              .get(sessionId, now, ...(taskTypeFilter ? [taskTypeFilter] : []));
         let taskRow = pendingRow;
         if (!taskRow) {
           const runningRow = db.prepare(`SELECT t.task_id, t.task_type, t.payload, t.status
@@ -120,7 +121,7 @@ export function claimTask({ db, sessionId, namespace = 'default', taskTypeFilter
           return { ok: false, reason: 'no_task' };
         }
 
-        const idem = `task-claim:${taskRow.task_id}`;
+        const idem = `task-claim:${taskRow.task_id}:${lockToken}`;
         const seq = nextSeq(db, sessionId);
         try {
           db.prepare(`INSERT INTO event_log(session_id, event_seq, event_type, actor_agent, idempotency_key, payload, status)
@@ -219,7 +220,6 @@ export function releaseTask({ db, sessionId, taskId, lockToken, result, agent = 
     return { ok: false, reason: 'lock_mismatch' };
   }
 
-  const status = result.ok ? 'done' : 'failed';
   const eventType = result.ok ? 'task_finished' : 'task_failed';
   const idem = `task-finalize:${taskId}`;
 
@@ -229,34 +229,67 @@ export function releaseTask({ db, sessionId, taskId, lockToken, result, agent = 
       try {
         db.prepare(`INSERT INTO event_log(session_id, event_seq, event_type, actor_agent, idempotency_key, payload, status, error_code)
                     VALUES(?, ?, ?, ?, ?, ?, ?, ?)`) 
-          .run(sessionId, seq, eventType, agent, idem, JSON.stringify({ task_id: taskId, result }), status, result.errorCode || null);
+          .run(sessionId, seq, eventType, agent, idem, JSON.stringify({ task_id: taskId, result }), result.ok ? 'done' : 'error', result.errorCode || null);
       } catch (e) {
         if (!/UNIQUE/.test(String(e.message))) throw e;
-        // Already finalized; still return success
+        // Idempotent retries: if finalized already, continue
       }
 
-      db.prepare(`UPDATE task_queue SET status=?, finished_at=?, error_code=?, error_msg=? WHERE task_id=?`)
-        .run(status, now, result.errorCode || null, result.errorMsg || null, taskId);
+      const taskRow = db.prepare(`SELECT retry_count, max_retries, session_id FROM task_queue WHERE task_id=?`).get(taskId);
+      const currentRetryCount = Number(taskRow?.retry_count || 0);
+      const maxRetries = Number(taskRow?.max_retries || DEFAULT_MAX_RETRIES);
 
-      if (!result.ok) {
-        const taskRow = db.prepare(`SELECT retry_count, session_id FROM task_queue WHERE task_id=?`).get(taskId);
-        if (taskRow && Number(taskRow.retry_count || 0) >= 3) {
-          addDeadLetter({
-            db,
-            taskId,
-            sessionId: taskRow.session_id,
-            reason: 'retry_limit_reached',
-            payload: { taskId, sessionId: taskRow.session_id, retry_count: taskRow.retry_count, last_error: result.errorMsg || result.errorCode },
-            errorCode: result.errorCode || null,
-          });
-        }
+      const finalTaskStatus = result.ok
+        ? 'done'
+        : (shouldRetry({ retry_count: currentRetryCount, max_retries: maxRetries }) ? RETRY_STATUS_QUEUED : 'failed');
+      const nextRetryCount = currentRetryCount + 1;
+      const nextRetryAt = result.ok
+        ? null
+        : (finalTaskStatus === RETRY_STATUS_QUEUED ? getNextRetryAt(nextRetryCount, { initialDelayMs: 1000, backoffFactor: 2, jitterMs: 0 }) : null);
+      const nextRetryValue = finalTaskStatus === RETRY_STATUS_QUEUED ? nextRetryAt : null;
+      const nextRetryCountValue = result.ok ? currentRetryCount : nextRetryCount;
+
+      db.prepare(`UPDATE task_queue
+        SET status=?, finished_at=?, retry_count=?, error_code=?, error_msg=?, last_error=?, owner_agent=?, next_retry_at=?
+        WHERE task_id=?`)
+        .run(
+          finalTaskStatus,
+          now,
+          nextRetryCountValue,
+          result.errorCode || null,
+          result.errorMsg || null,
+          result.errorMsg || result.errorCode || null,
+          null,
+          nextRetryValue,
+          taskId
+        );
+
+      if (!result.ok && finalTaskStatus === RETRY_STATUS_QUEUED) {
+        logLockEvent({
+          db,
+          lockKey,
+          sessionId,
+          eventType: 'task_retry_enqueued',
+          actor: agent,
+          payload: { taskId, retry_count: nextRetryCount, retry_at: nextRetryAt }
+        });
       }
 
-      const chkSeq = seq;
+      if (!result.ok && finalTaskStatus === 'failed') {
+        addDeadLetter({
+          db,
+          taskId,
+          sessionId: taskRow?.session_id,
+          reason: 'retry_limit_reached',
+          payload: { taskId, sessionId: taskRow?.session_id, retry_count: nextRetryCount, last_error: result.errorMsg || result.errorCode },
+          errorCode: result.errorCode || null,
+        });
+      }
+
       db.prepare(`UPDATE session_state SET status='waiting', phase='idle', inflight_task_id=NULL, checkpoint_seq=?, heartbeat_at=?, updated_at=?, lock_token=NULL, lock_expires_at=NULL
-                  WHERE session_id=?`).run(chkSeq, now, now, sessionId);
+                  WHERE session_id=?`).run(seq, now, now, sessionId);
       db.prepare('DELETE FROM distributed_lock WHERE lock_key=? AND owner_token=?').run(lockKey, lockToken);
-      return { ok: true };
+      return { ok: true, status: finalTaskStatus, retries: nextRetryCountValue };
     });
   };
 
@@ -272,5 +305,8 @@ export function releaseTask({ db, sessionId, taskId, lockToken, result, agent = 
     return { ok: false, reason: 'error', error: String(err) };
   }
 }
+
+export const startTask = claimTask;
+export const completeTask = releaseTask;
 
 export { LOCK_TTL_MS, HEARTBEAT_MS };

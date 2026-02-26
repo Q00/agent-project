@@ -69,6 +69,45 @@ async function run() {
   const duplicateEventAfter = countEvents('s4');
   assert(duplicateEventAfter === duplicateEventBefore, 'no new event on duplicate');
 
+
+  // 5) failed task auto-requeue path
+  seedSession('s6');
+  const c6a = claimTask({ db, sessionId: 's6', agent: 'a1' });
+  assert(c6a.ok, 'claim for retry path');
+  const r6 = releaseTask({
+    db,
+    sessionId: 's6',
+    taskId: c6a.taskId,
+    lockToken: c6a.lockToken,
+    agent: 'a1',
+    result: { ok: false, errorCode: 'E_FAIL', errorMsg: 'temporary failure', retry: true }
+  });
+  assert(r6.ok, 'failed task re-queued successfully');
+  const row6 = db.prepare("SELECT status, retry_count, next_retry_at FROM task_queue WHERE task_id=?").get(c6a.taskId);
+  assert(row6.status === 'queued', 'failed task queued for retry');
+  assert(Number(row6.retry_count) === 1, 'retry count increments to 1');
+  assert(row6.next_retry_at != null, 'retry due time assigned');
+
+  // 6) retry limit -> dead letter
+  // force retry limit reached and ready for immediate retry
+  const dueNow = new Date(Date.now() - 1000).toISOString();
+  db.prepare("UPDATE task_queue SET retry_count=?, status='queued', owner_agent=NULL, next_retry_at=? WHERE task_id=?").run(3, dueNow, c6a.taskId);
+  const c6b = claimTask({ db, sessionId: 's6', agent: 'a1' });
+  assert(c6b.ok, 'claim stale retriable task before dead-letter simulation');
+  const r6b = releaseTask({
+    db,
+    sessionId: 's6',
+    taskId: c6a.taskId,
+    lockToken: c6b.lockToken,
+    agent: 'a1',
+    result: { ok: false, errorCode: 'E_FAIL', errorMsg: 'retry exhausted' }
+  });
+  assert(r6b.ok, 'failed task handled at max retries');
+  const row6f = db.prepare("SELECT status, retry_count FROM task_queue WHERE task_id=?").get(c6a.taskId);
+  assert(row6f.status === 'failed', 'failed task marked failed after max retries');
+  const dl = db.prepare("SELECT COUNT(*) AS c FROM dead_letters WHERE task_id=?").get(c6a.taskId).c;
+  assert(Number(dl) >= 1, 'dead letter recorded');
+
   // stale path check
   seedSession('s5');
   const c5a = claimTask({ db, sessionId: 's5', agent: 'a1' });
