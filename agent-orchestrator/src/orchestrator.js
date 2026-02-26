@@ -242,6 +242,8 @@ export function releaseTask({ db, sessionId, taskId, lockToken, result, agent = 
       const finalTaskStatus = result.ok
         ? 'done'
         : (shouldRetry({ retry_count: currentRetryCount, max_retries: maxRetries }) ? RETRY_STATUS_QUEUED : 'failed');
+      // Retry count reported in the return payload is cumulative after this finalize attempt.
+      // task_row.retry_count persists the same value (nextRetryCountValue).
       const nextRetryCount = currentRetryCount + 1;
       const nextRetryAt = result.ok
         ? null
