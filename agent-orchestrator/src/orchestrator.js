@@ -4,6 +4,9 @@ import { executeWithRetrySync, getNextRetryAt, isRetryable } from './retryPolicy
 import { logLockEvent } from './ops.js';
 import { addDeadLetter } from './dead_letter_handler.js';
 
+// Task Queue API exports
+export * from './taskQueue.js';
+
 const LOCK_TTL_MS = 120000;
 const HEARTBEAT_MS = 30000;
 

@@ -3,10 +3,16 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const { db, dbPath } = openDatabase();
-const schemaPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'schema.sql');
-const schema = readFileSync(schemaPath, 'utf8');
+export function initSchema(db) {
+  const schemaPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'schema.sql');
+  const schema = readFileSync(schemaPath, 'utf8');
+  db.exec(schema);
+}
 
-db.exec(schema);
-console.log(`Initialized sqlite db at: ${dbPath}`);
-db.close();
+// CLI usage
+if (process.argv[1] === fileURLToPath(import.meta.url).href) {
+  const { db, dbPath } = openDatabase();
+  initSchema(db);
+  console.log(`Initialized sqlite db at: ${dbPath}`);
+  db.close();
+}
